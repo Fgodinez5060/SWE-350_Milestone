@@ -40,6 +40,21 @@ int switch_get_bet_amount(void);
  */
 int switch_is_valid_selection(void);
 
+// Read button states (active-low)
+int button_read(void);
+
+// Check if spin button (KEY0) pressed
+int button_is_spin_pressed(void);
+
+// Check if reset button (KEY3) pressed
+int button_is_reset_pressed(void);
+
+// Check if specific key pressed (0-3)
+int button_is_key_pressed(int key_number);
+
+// Wait for button press
+void button_wait_for_press(int button_mask);
+
 /*
  * Clean up switch resources
  */
