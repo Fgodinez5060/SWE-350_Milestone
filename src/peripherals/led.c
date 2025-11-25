@@ -1,69 +1,123 @@
 /*
  * led.c
- * LED control implementation for roulette wheel
+ * LED control using memory-mapped I/O
  */
 
 #include "peripherals/led.h"
 #include "../lib/address_map_arm.h"
 #include "../includes/config.h"
 #include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
-// Virtual address pointer for LED control
-static volatile int *LEDR_ptr = NULL;
+static void *virtual_base = NULL;
+static volatile uint32_t *led_ptr = NULL;
+static int fd = -1;
 
 void led_init(void) {
-    // STUB FUNCTION - Will implement in Milestone 4
-    // Pseudocode:
-    // 1. Map lightweight bridge base address using ioremap_nocache()
-    // 2. Calculate LEDR_ptr = base_virtual + LEDR_BASE offset
-    // 3. Initialize all LEDs to off state (*LEDR_ptr = 0x00)
+    // Open /dev/mem
+    if ((fd = open("/dev/mem", (O_RDWR | O_SYNC))) == -1) {
+        printf("[LED] ERROR: could not open /dev/mem\n");
+        return;
+    }
     
-    printf("[LED] Initialization stub called\n");
-    // Placeholder: Assume successful initialization
+    // Map memory
+    virtual_base = mmap(NULL, HW_REGS_SPAN, (PROT_READ | PROT_WRITE), 
+                       MAP_SHARED, fd, HW_REGS_BASE);
+    
+    if (virtual_base == MAP_FAILED) {
+        printf("[LED] ERROR: mmap() failed\n");
+        close(fd);
+        fd = -1;
+        return;
+    }
+    
+    // Calculate LED address
+    led_ptr = (uint32_t *)(virtual_base + 
+              ((unsigned long)(ALT_LWFPGASLVS_OFST + LED_PIO_BASE) & 
+               (unsigned long)(HW_REGS_MASK)));
+    
+    // Turn off all LEDs
+    *led_ptr = 0x3FF;
+    
+    printf("[LED] Initialization complete\n");
 }
 
 int led_set_position(int position) {
-    // STUB FUNCTION - Will implement in Milestone 4
-    // Pseudocode:
-    // 1. Validate position is in range (0-9)
-    // 2. Calculate bit pattern for single LED (1 << position)
-    // 3. Write bit pattern to LED register (*LEDR_ptr = pattern)
-    // 4. Return 0 on success, -1 on invalid position
+    if (led_ptr == NULL) {
+        printf("[LED] ERROR: LED not initialized\n");
+        return -1;
+    }
     
-    printf("[LED] Set position %d (stub)\n", position);
-    return 0;  //* Placeholder return
+    if (position < 0 || position >= NUM_LEDS) {
+        printf("[LED] ERROR: Invalid position %d\n", position);
+        return -1;
+    }
+    
+    // Inverted logic: clear bit to turn LED on
+    uint32_t led_mask = ~(1 << position);
+    *led_ptr = led_mask;
+    
+    return 0;
 }
 
 void led_clear_all(void) {
-    // STUB FUNCTION - Will implement in Milestone 4
-    // Pseudocode:
-    // 1. Write 0x00 to LED register to turn off all LEDs
-    // 2. (*LEDR_ptr = 0x00)
+    if (led_ptr == NULL) {
+        printf("[LED] ERROR: LED not initialized\n");
+        return;
+    }
     
-    printf("[LED] Clear all LEDs (stub)\n");
+    *led_ptr = 0x3FF;
 }
 
 int led_spin_animation(int final_position) {
-    // STUB FUNCTION - Will implement in Milestone 4
-    // Pseudocode:
-    // 1. Validate final_position is in range (0-9)
-    // 2. Calculate number of LED transitions (TOTAL_SPIN_TIME_MS / LED_SPIN_DELAY_MS)
-    // 3. Loop through LED positions sequentially:
-    //    a. Light up current LED using led_set_position()
-    //    b. Delay for LED_SPIN_DELAY_MS using usleep()
-    //    c. Move to next position (wrap around at NUM_LEDS)
-    // 4. End animation on final_position
-    // 5. Return 0 on success
+    if (led_ptr == NULL) {
+        printf("[LED] ERROR: LED not initialized\n");
+        return -1;
+    }
     
-    printf("[LED] Spin animation to position %d (stub)\n", final_position);
-    return 0;  // Placeholder return
+    if (final_position < 0 || final_position >= NUM_LEDS) {
+        printf("[LED] ERROR: Invalid final position %d\n", final_position);
+        return -1;
+    }
+    
+    int num_transitions = TOTAL_SPIN_TIME_MS / LED_SPIN_DELAY_MS;
+    int current_position = 0;
+    
+    printf("[LED] Starting spin animation...\n");
+    
+    // Spin through LEDs
+    for (int i = 0; i < num_transitions; i++) {
+        led_set_position(current_position);
+        usleep(LED_SPIN_DELAY_MS * 1000);
+        current_position = (current_position + 1) % NUM_LEDS;
+    }
+    
+    // Stop on final position
+    led_set_position(final_position);
+    
+    printf("[LED] Spin complete at position %d\n", final_position);
+    return 0;
 }
 
 void led_cleanup(void) {
-    // STUB FUNCTION - Will implement in Milestone 4
-    // Pseudocode:
-    // 1. Turn off all LEDs (led_clear_all())
-    // 2. Unmap virtual memory (iounmap)
+    printf("[LED] Cleaning up...\n");
     
-    printf("[LED] Cleanup (stub)\n");
+    if (led_ptr != NULL) {
+        *led_ptr = 0x3FF;
+    }
+    
+    if (virtual_base != NULL) {
+        munmap(virtual_base, HW_REGS_SPAN);
+        virtual_base = NULL;
+        led_ptr = NULL;
+    }
+    
+    if (fd != -1) {
+        close(fd);
+        fd = -1;
+    }
+    
+    printf("[LED] Cleanup complete\n");
 }
