@@ -1,118 +1,274 @@
 /*
  * main.c
- * Main application entry point for DE-10 Roulette Game
- * Description:
- * This application implements a roulette game on the DE-10 Standard board.
- * Players use switches to select bet amounts and press a button to spin.
- * LEDs visualize the spinning wheel, and an LCD displays the balance.
+ * Roulette game main program
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "peripherals/led.h"
 #include "peripherals/switch.h"
 #include "peripherals/display.h"
 #include "game-logic/game-logic.h"
 #include "config.h"
 
-// Forward declaration of main game loop
 void run_game(void);
+void show_menu(void);
+int get_menu_choice(void);
+int get_bet_position(void);
+void flash_winning_led(int position);
 
 int main(void) {
     printf("=== DE-10 Roulette Game ===\n");
     printf("Initializing hardware...\n\n");
     
-    // Run the main game loop
     run_game();
     
-    printf("\nGame terminated. Goodbye!\n");
+    printf("\nGame terminated\n");
     return 0;
 }
 
+void show_menu(void) {
+    printf("\n========================================\n");
+    printf("         MAIN MENU\n");
+    printf("========================================\n");
+    printf("KEY0 = Play\n");
+    printf("KEY1 = Reset\n");
+    printf("KEY2 = Check balance\n");
+    printf("KEY3 = Quit\n");
+    printf("========================================\n");
+}
+
+int get_menu_choice(void) {
+    while (1) {
+        if (button_is_key_pressed(0)) {
+            printf("[MENU] Play\n");
+            return 0;
+        }
+        if (button_is_key_pressed(1)) {
+            printf("[MENU] Reset\n");
+            return 1;
+        }
+        if (button_is_key_pressed(2)) {
+            printf("[MENU] Check Balance\n");
+            return 2;
+        }
+        if (button_is_key_pressed(3)) {
+            printf("[MENU] Quit\n");
+            return 3;
+        }
+        usleep(50000);
+    }
+}
+
+int get_bet_position(void) {
+    printf("\n>>> SELECT BET POSITION <<<\n");
+    printf("Flip ONE switch (SW0-SW9) and press KEY0 to confirm\n\n");
+    
+    int selected_position = -1;
+    
+    while (1) {
+        int switches = switch_read();
+        
+        // Check if exactly one switch active
+        if (switches != 0 && (switches & (switches - 1)) == 0) {
+            for (int i = 0; i < NUM_LEDS; i++) {
+                if (switches & (1 << i)) {
+                    selected_position = i;
+                    break;
+                }
+            }
+            
+            led_set_position(selected_position);
+            
+            printf("\rPosition: LED %d | Press KEY0 to confirm...  ", selected_position);
+            fflush(stdout);
+            
+            if (button_is_key_pressed(0)) {
+                printf("\n[BET] Position %d confirmed\n", selected_position);
+                led_clear_all();
+                usleep(300000);
+                return selected_position;
+            }
+        } else if (switches == 0) {
+            printf("\rNo switch selected                           ");
+            fflush(stdout);
+            led_clear_all();
+        } else {
+            printf("\rMultiple switches - select only ONE          ");
+            fflush(stdout);
+            led_clear_all();
+        }
+        
+        usleep(100000);
+    }
+}
+
+void flash_winning_led(int position) {
+    printf("[LED] Flashing winning position...\n");
+    
+    // Flash 6 times
+    for (int i = 0; i < 6; i++) {
+        led_set_position(position);
+        usleep(250000);
+        led_clear_all();
+        usleep(250000);
+    }
+    
+    led_set_position(position);
+    usleep(500000);
+}
+
 void run_game(void) {
-    // STUB FUNCTION - Will implement full game loop in Milestone 4
-    // Pseudocode:
-    // 1. Initialize all hardware peripherals:
-    //    a. led_init()
-    //    b. switch_init()
-    //    c. display_init()
-    // 2. Initialize game state using game_init()
-    // 3. Display welcome screen
-    // 4. Main game loop (while game is active):
-    //    a. Read switch state to get bet amount
-    //    b. Validate switch selection
-    //    c. Wait for button press (KEY0 for spin, KEY3 for reset)
-    //    d. If spin button pressed:
-    //       i.   Check if player can afford bet
-    //       ii.  Generate random final position
-    //       iii. Animate LED spin to final position
-    //       iv.  Process round (update balance)
-    //       v.   Display updated balance
-    //    e. If reset button pressed:
-    //       i.   Reset game state
-    //       ii.  Display welcome screen
-    //    f. Check if game should end (balance <= 0)
-    // 5. Clean up all hardware resources:
-    //    a. led_cleanup()
-    //    b. switch_cleanup()
-    //    c. display_cleanup()
+    printf("[MAIN] Starting initialization...\n");
     
-    printf("[MAIN] Starting game initialization...\n");
-    
-    // Initialize hardware (stub calls)
+    // Initialize hardware
     led_init();
     switch_init();
     display_init();
     
-    // Initialize game state
+    // Initialize game
     GameState game = game_init();
     
-    // Show welcome message
     display_welcome();
     display_balance(game.balance);
     
-    printf("[MAIN] Game loop starting (stub - will implement button polling in M4)...\n");
+    printf("\n[MAIN] ========================================\n");
+    printf("[MAIN] DE-10 Roulette Game - READY!\n");
+    printf("[MAIN] Starting Balance: $%d\n", game.balance);
+    printf("[MAIN] ========================================\n\n");
     
-    // Simulate one round for demonstration
-    printf("\n--- Simulating one game round ---\n");
+    int running = 1;
     
-    // Get bet from switches
-    int bet = switch_get_bet_amount();
-    game.bet_amount = bet;
-    game.bet_position = 3;  // Placeholder: Player bets on position 3
-    
-    printf("[MAIN] Player bets $%d on position %d\n", game.bet_amount, game.bet_position);
-    
-    // Check if player can afford bet
-    if (game_can_afford_bet(&game)) {
-        // Generate random position
-        int final_pos = game_generate_random_position();
+    while (running && game.is_game_active) {
+        show_menu();
+        int choice = get_menu_choice();
         
-        // Animate spin
-        led_spin_animation(final_pos);
-        
-        // Process results
-        int won = game_process_round(&game, final_pos);
-        
-        if (won) {
-            display_message("You Won!");
-        } else {
-            display_message("You Lost!");
+        switch (choice) {
+            case 0:  // PLAY
+                printf("\n[GAME] Starting round\n");
+                printf("Balance: $%d\n", game.balance);
+                
+                // Select bet amount
+                printf("\n>>> SELECT BET AMOUNT <<<\n");
+                printf("SW0=$10, SW1=$20, SW2=$50, SW3=$100\n");
+                printf("Press KEY0 to confirm\n\n");
+                
+                int bet_amount = -1;
+                int selected_amount = -1;
+                
+                while (bet_amount == -1) {
+                    int switches = switch_read() & 0x0F;
+                    
+                    if (switches != 0 && (switches & (switches - 1)) == 0) {
+                        if (switches & 0x01) selected_amount = BET_AMOUNT_SW0;
+                        else if (switches & 0x02) selected_amount = BET_AMOUNT_SW1;
+                        else if (switches & 0x04) selected_amount = BET_AMOUNT_SW2;
+                        else if (switches & 0x08) selected_amount = BET_AMOUNT_SW3;
+                        
+                        printf("\rBet: $%d | Press KEY0...  ", selected_amount);
+                        fflush(stdout);
+                        
+                        if (button_is_key_pressed(0)) {
+                            bet_amount = selected_amount;
+                            printf("\n[BET] $%d confirmed\n", bet_amount);
+                            break;
+                        }
+                    } else {
+                        printf("\rSelect ONE switch (SW0-SW3)  ");
+                        fflush(stdout);
+                        selected_amount = -1;
+                    }
+                    usleep(100000);
+                }
+                
+                game.bet_amount = bet_amount;
+                
+                if (!game_can_afford_bet(&game)) {
+                    printf("\n[ERROR] Insufficient funds\n");
+                    display_error("Insufficient Funds");
+                    usleep(2000000);
+                    continue;
+                }
+                
+                // Get position
+                game.bet_position = get_bet_position();
+                
+                printf("\n[GAME] Spinning...\n");
+                printf("Bet: $%d on position %d\n", game.bet_amount, game.bet_position);
+                
+                int final_position = game_generate_random_position();
+                
+                led_spin_animation(final_position);
+                
+                printf("\n[GAME] Landed on: %d\n", final_position);
+                
+                int won = game_process_round(&game, final_position);
+                
+                flash_winning_led(final_position);
+                led_clear_all();
+                
+                if (won) {
+                    printf("\n*** YOU WON! ***\n");
+                    printf("Won: $%d\n", game.bet_amount * PAYOUT_MULTIPLIER);
+                    display_message("You Won!");
+                } else {
+                    printf("\n*** YOU LOST ***\n");
+                    printf("Lost: $%d\n", game.bet_amount);
+                    display_message("You Lost!");
+                }
+                
+                printf("Balance: $%d\n", game.balance);
+                display_balance(game.balance);
+                
+                if (game.balance <= 0) {
+                    printf("\n========================================\n");
+                    printf("         GAME OVER\n");
+                    printf("========================================\n");
+                    display_message("Game Over!");
+                    game.is_game_active = 0;
+                    usleep(3000000);
+                }
+                
+                usleep(2000000);
+                break;
+                
+            case 1:  // RESET
+                printf("\n[GAME] Resetting...\n");
+                game_reset(&game);
+                display_welcome();
+                display_balance(game.balance);
+                printf("Reset complete\n");
+                usleep(2000000);
+                break;
+                
+            case 2:  // CHECK BALANCE
+                printf("\n[GAME] Balance: $%d\n", game.balance);
+                display_balance(game.balance);
+                usleep(2000000);
+                break;
+                
+            case 3:  // QUIT
+                printf("\n[GAME] Quitting...\n");
+                running = 0;
+                break;
+                
+            default:
+                break;
         }
-        
-        // Update display
-        display_balance(game.balance);
-    } else {
-        display_error("Insufficient Funds");
     }
     
-    printf("\n[MAIN] Demo round complete. Full game loop will be in Milestone 4.\n");
+    if (!game.is_game_active) {
+        printf("\n========================================\n");
+        printf("         GAME OVER\n");
+        printf("         Final Balance: $%d\n", game.balance);
+        printf("========================================\n");
+    }
     
-    // Clean up hardware
-    printf("\n[MAIN] Cleaning up hardware...\n");
+    printf("\n[MAIN] Cleaning up...\n");
     led_cleanup();
     switch_cleanup();
     display_cleanup();
     
-    printf("[MAIN] Game loop ended\n");
+    printf("[MAIN] Done\n");
 }
