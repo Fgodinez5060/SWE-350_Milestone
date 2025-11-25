@@ -8,34 +8,21 @@
 
 ## Project Description
 
-This project implements a roulette game on the DE-10 Standard board using the ARM HPS processor. Players use physical switches to select bet amounts, LEDs visualize the spinning roulette wheel, and an LCD display shows the current balance and game messages.
+This project implements a roulette game on the DE-10 Standard board using the ARM HPS processor. Players use physical switches to select bet amounts, LEDs visualize the spinning roulette wheel, an LCD display shows the current balance and game messages and push buttons to control the game flow.
 
-## Building the Project
+## Errors:
+- LED9 Does not turn on (possible VHDL error)
+- Slight button multi press which has been contained with a sleep
+- No display functionality except for console
 
-```bash
 # Build the project
 make
 
 # Clean build artifacts
 make clean
 
-# Rebuild from scratch
-make rebuild
-
-# Show help
-make help
-```
-
-## Running the Project
-
-```bash
 # Compile
 make
 
-# Run (prints stub messages)
+# Run
 ./roulette_game
-```
-
-## GitHub Repository
-
-- 
