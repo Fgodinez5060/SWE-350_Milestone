@@ -4,7 +4,7 @@
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -Iincludes -Ilib -Wall -Wextra -g
+CFLAGS = -Iincludes -Ilib -Wall -Wextra -g -std=c99
 
 # Source files
 SRC = src/main.c \
