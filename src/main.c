@@ -9,6 +9,7 @@
 #include "peripherals/led.h"
 #include "peripherals/switch.h"
 #include "peripherals/display.h"
+#include "peripherals/hex.h"
 #include "game-logic/game-logic.h"
 #include "config.h"
 
@@ -126,12 +127,14 @@ void run_game(void) {
     led_init();
     switch_init();
     display_init();
+    hex_init();
     
     // Initialize game
     GameState game = game_init();
     
     display_welcome();
     display_balance(game.balance);
+    hex_display_number(game.balance);
     
     printf("\n[MAIN] ========================================\n");
     printf("[MAIN] DE-10 Roulette Game - READY!\n");
@@ -220,6 +223,7 @@ void run_game(void) {
                 
                 printf("Balance: $%d\n", game.balance);
                 display_balance(game.balance);
+                hex_display_number(game.balance);
                 
                 if (game.balance <= 0) {
                     printf("\n========================================\n");
@@ -238,6 +242,7 @@ void run_game(void) {
                 game_reset(&game);
                 display_welcome();
                 display_balance(game.balance);
+                hex_display_number(game.balance);
                 printf("Reset complete\n");
                 usleep(2000000);
                 break;
@@ -245,6 +250,7 @@ void run_game(void) {
             case 2:  // CHECK BALANCE
                 printf("\n[GAME] Balance: $%d\n", game.balance);
                 display_balance(game.balance);
+                hex_display_number(game.balance);
                 usleep(2000000);
                 break;
                 
@@ -269,6 +275,7 @@ void run_game(void) {
     led_cleanup();
     switch_cleanup();
     display_cleanup();
+    hex_cleanup();
     
     printf("[MAIN] Done\n");
 }
