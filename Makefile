@@ -11,6 +11,7 @@ SRC = src/main.c \
       src/peripherals/led.c \
       src/peripherals/switch.c \
       src/peripherals/display.c \
+      src/peripherals/hex.c \
       src/game-logic/game-logic.c
 
 # Object files
